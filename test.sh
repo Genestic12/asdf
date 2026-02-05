@@ -200,36 +200,36 @@ function provisioning_print_end() {
 
 
 # Download from $1 URL to $2 file path
-provisioning_download() {
+function provisioning_download() {
   local url="$1"
-  local dest_dir="$2"
+  local outdir="$2"
 
-  mkdir -p "$dest_dir"
+  mkdir -p "$outdir"
 
-  # Token selection
-  local header_args=()
-  if [[ "$url" == *"civitai.com"* && -n "${CIVITAI_TOKEN:-}" ]]; then
-    header_args=(-H "Authorization: Bearer ${CIVITAI_TOKEN}")
-  elif [[ "$url" == *"huggingface.co"* && -n "${HF_TOKEN:-}" ]]; then
-    header_args=(-H "Authorization: Bearer ${HF_TOKEN}")
+  # Add token headers only for the origin hosts.
+  local headers=()
+  if [[ -n "${HF_TOKEN:-}" && "$url" == *"huggingface.co"* ]]; then
+    headers+=(-H "Authorization: Bearer ${HF_TOKEN}")
+  elif [[ -n "${CIVITAI_TOKEN:-}" && "$url" == *"civitai.com"* ]]; then
+    headers+=(-H "Authorization: Bearer ${CIVITAI_TOKEN}")
   fi
 
   echo "[download] $url"
 
-  # Probe HTTP code first (helps diagnose 403/429/404 quickly)
+  # Print final HTTP code for visibility (doesn't download yet).
   local code
-  code="$(curl -sS -L -o /dev/null -w "%{http_code}" "${header_args[@]}" "$url" || true)"
+  code="$(curl -sS -L -o /dev/null -w "%{http_code}" -A "Mozilla/5.0" "${headers[@]}" "$url" || true)"
   echo "[download] http=$code"
 
-  # Retry + follow redirects + keep filename from server
-  curl -fL --retry 15 --retry-delay 3 --retry-connrefused \
-    -A "Mozilla/5.0" \
-    -C - \
-    -OJ \
-    "${header_args[@]}" \
-    --output-dir "$dest_dir" \
+  # Actual download (follows redirect to R2)
+  curl -fL -A "Mozilla/5.0" \
+    --retry 15 --retry-delay 3 --retry-connrefused \
+    -C - -OJ \
+    "${headers[@]}" \
+    --output-dir "$outdir" \
     "$url"
 }
+
 
 
 
