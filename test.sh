@@ -67,6 +67,17 @@ CONTROLNET_MODELS=(
 
 function provisioning_start() {
     # We need to apply some workarounds to make old builds work with the new default
+    if [[ -z "${CIVITAI_TOKEN:-}" ]]; then
+      echo "[warn] CIVITAI_TOKEN is NOT set. Some civitai downloads may fail."
+    else
+      echo "[info] CIVITAI_TOKEN is set (len=${#CIVITAI_TOKEN})."
+    fi
+
+    echo "[sync] removing incompatible syncthing config (if present)"
+    rm -rf /workspace/home/user/.config/syncthing 2>/dev/null || true
+    rm -rf /home/user/.config/syncthing 2>/dev/null || true
+    pkill -f syncthing 2>/dev/null || true
+
     if [[ ! -d /opt/environments/python ]]; then 
         export MAMBA_BASE=true
     fi
@@ -189,44 +200,37 @@ function provisioning_print_end() {
 
 
 # Download from $1 URL to $2 file path
-function provisioning_download() {
+provisioning_download() {
   local url="$1"
-  local outdir="$2"
-  local dotbytes="${3:-4M}"
+  local dest_dir="$2"
 
-  mkdir -p "$outdir"
+  mkdir -p "$dest_dir"
 
-  local auth_token=""
-  if [[ -n "${HF_TOKEN:-}" && "$url" =~ ^https://([a-zA-Z0-9_-]+\.)?huggingface\.co(/|$|\?) ]]; then
-    auth_token="$HF_TOKEN"
-  elif [[ -n "${CIVITAI_TOKEN:-}" && "$url" =~ ^https://([a-zA-Z0-9_-]+\.)?civitai\.com(/|$|\?) ]]; then
-    auth_token="$CIVITAI_TOKEN"
+  # Token selection
+  local header_args=()
+  if [[ "$url" == *"civitai.com"* && -n "${CIVITAI_TOKEN:-}" ]]; then
+    header_args=(-H "Authorization: Bearer ${CIVITAI_TOKEN}")
+  elif [[ "$url" == *"huggingface.co"* && -n "${HF_TOKEN:-}" ]]; then
+    header_args=(-H "Authorization: Bearer ${HF_TOKEN}")
   fi
 
-  # Common robust flags:
-  # -c                 resume partial downloads
-  # --tries/--waitretry retry transient failures
-  # --timeout          avoid hanging forever
-  # (NO -nc)           allow re-download if previous file is bad
-  local base_args=(--content-disposition --show-progress -e "dotbytes=$dotbytes"
-                   --tries=20 --waitretry=5 --retry-connrefused --timeout=20
-                   -c -P "$outdir")
+  echo "[download] $url"
 
-  if [[ -n "$auth_token" ]]; then
-    wget --header="Authorization: Bearer $auth_token" "${base_args[@]}" "$url"
-  else
-    wget "${base_args[@]}" "$url"
-  fi
+  # Probe HTTP code first (helps diagnose 403/429/404 quickly)
+  local code
+  code="$(curl -sS -L -o /dev/null -w "%{http_code}" "${header_args[@]}" "$url" || true)"
+  echo "[download] http=$code"
 
-  # Optional: fail fast if the newest file is HTML/text (often means rate limit or missing token)
-  local newest
-  newest="$(ls -t "$outdir" | head -n 1)"
-  if [[ -n "$newest" ]] && file "$outdir/$newest" | grep -qiE 'html|text'; then
-    echo "[error] Downloaded a text/HTML file instead of a model: $outdir/$newest"
-    echo "        Usually auth/rate-limit/redirect. Delete the file and retry."
-    return 1
-  fi
+  # Retry + follow redirects + keep filename from server
+  curl -fL --retry 15 --retry-delay 3 --retry-connrefused \
+    -A "Mozilla/5.0" \
+    -C - \
+    -OJ \
+    "${header_args[@]}" \
+    --output-dir "$dest_dir" \
+    "$url"
 }
+
 
 
 provisioning_start
