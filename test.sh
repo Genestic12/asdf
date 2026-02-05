@@ -37,7 +37,13 @@ CHECKPOINT_MODELS=(
 
 LORA_MODELS=(
     #"https://civitai.com/api/download/models/16576"
-    "https://civitai.com/api/download/models/1343048?type=Model&format=SafeTensor"
+    #"https://civitai.com/api/download/models/1343048?type=Model&format=SafeTensor" #flared equine
+    "https://civitai.com/api/download/models/1457585?type=Model&format=SafeTensor" #detailed equine female
+    "https://civitai.com/api/download/models/1339237?type=Model&format=SafeTensor" #tapered cervine
+    "https://civitai.com/api/download/models/1570728?type=Model&format=SafeTensor" #equine (non FAO)
+    "https://civitai.com/api/download/models/1965314?type=Model&format=SafeTensor" #canine female
+    "https://civitai.com/api/download/models/2149223?type=Model&format=SafeTensor" #canine male
+    
 )
 
 VAE_MODELS=(
