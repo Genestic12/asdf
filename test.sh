@@ -155,24 +155,26 @@ function provisioning_get_extensions() {
 }
 
 function provisioning_get_models() {
-    if [[ -z $2 ]]; then return 1; fi
-    dir="$1"
-    mkdir -p "$dir"
-    shift
-    if [[ $DISK_GB_ALLOCATED -ge $DISK_GB_REQUIRED ]]; then
-        arr=("$@")
-    else
-        printf "WARNING: Low disk space allocation - Only the first model will be downloaded!\n"
-        arr=("$1")
-    fi
-    
-    printf "Downloading %s model(s) to %s...\n" "${#arr[@]}" "$dir"
-    for url in "${arr[@]}"; do
-        printf "Downloading: %s\n" "${url}"
-        provisioning_download "${url}" "${dir}"
-        printf "\n"
-    done
+  if [[ -z $2 ]]; then return 1; fi
+  dir="$1"
+  mkdir -p "$dir"
+  shift
+
+  # Keep warning, but download all requested models anyway
+  if [[ $DISK_GB_ALLOCATED -lt $DISK_GB_REQUIRED ]]; then
+    printf "WARNING: Low disk space allocation (%sGB < %sGB). Attempting all downloads anyway.\n" \
+      "$DISK_GB_ALLOCATED" "$DISK_GB_REQUIRED"
+  fi
+
+  arr=("$@")
+  printf "Downloading %s model(s) to %s...\n" "${#arr[@]}" "$dir"
+  for url in "${arr[@]}"; do
+    printf "Downloading: %s\n" "${url}"
+    provisioning_download "${url}" "${dir}"
+    printf "\n"
+  done
 }
+
 
 function provisioning_print_header() {
     printf "\n##############################################\n#                                            #\n#          Provisioning container            #\n#                                            #\n#         This will take some time           #\n#                                            #\n# Your container will be ready on completion #\n#                                            #\n##############################################\n\n"
@@ -188,17 +190,43 @@ function provisioning_print_end() {
 
 # Download from $1 URL to $2 file path
 function provisioning_download() {
-    if [[ -n $HF_TOKEN && $1 =~ ^https://([a-zA-Z0-9_-]+\.)?huggingface\.co(/|$|\?) ]]; then
-        auth_token="$HF_TOKEN"
-    elif 
-        [[ -n $CIVITAI_TOKEN && $1 =~ ^https://([a-zA-Z0-9_-]+\.)?civitai\.com(/|$|\?) ]]; then
-        auth_token="$CIVITAI_TOKEN"
-    fi
-    if [[ -n $auth_token ]];then
-        wget --header="Authorization: Bearer $auth_token" -qnc --content-disposition --show-progress -e dotbytes="${3:-4M}" -P "$2" "$1"
-    else
-        wget -qnc --content-disposition --show-progress -e dotbytes="${3:-4M}" -P "$2" "$1"
-    fi
+  local url="$1"
+  local outdir="$2"
+  local dotbytes="${3:-4M}"
+
+  mkdir -p "$outdir"
+
+  local auth_token=""
+  if [[ -n "${HF_TOKEN:-}" && "$url" =~ ^https://([a-zA-Z0-9_-]+\.)?huggingface\.co(/|$|\?) ]]; then
+    auth_token="$HF_TOKEN"
+  elif [[ -n "${CIVITAI_TOKEN:-}" && "$url" =~ ^https://([a-zA-Z0-9_-]+\.)?civitai\.com(/|$|\?) ]]; then
+    auth_token="$CIVITAI_TOKEN"
+  fi
+
+  # Common robust flags:
+  # -c                 resume partial downloads
+  # --tries/--waitretry retry transient failures
+  # --timeout          avoid hanging forever
+  # (NO -nc)           allow re-download if previous file is bad
+  local base_args=(--content-disposition --show-progress -e "dotbytes=$dotbytes"
+                   --tries=20 --waitretry=5 --retry-connrefused --timeout=20
+                   -c -P "$outdir")
+
+  if [[ -n "$auth_token" ]]; then
+    wget --header="Authorization: Bearer $auth_token" "${base_args[@]}" "$url"
+  else
+    wget "${base_args[@]}" "$url"
+  fi
+
+  # Optional: fail fast if the newest file is HTML/text (often means rate limit or missing token)
+  local newest
+  newest="$(ls -t "$outdir" | head -n 1)"
+  if [[ -n "$newest" ]] && file "$outdir/$newest" | grep -qiE 'html|text'; then
+    echo "[error] Downloaded a text/HTML file instead of a model: $outdir/$newest"
+    echo "        Usually auth/rate-limit/redirect. Delete the file and retry."
+    return 1
+  fi
 }
+
 
 provisioning_start
