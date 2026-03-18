@@ -67,17 +67,6 @@ CONTROLNET_MODELS=(
 
 function provisioning_start() {
     # We need to apply some workarounds to make old builds work with the new default
-    if [[ -z "${CIVITAI_TOKEN:-}" ]]; then
-      echo "[warn] CIVITAI_TOKEN is NOT set. Some civitai downloads may fail."
-    else
-      echo "[info] CIVITAI_TOKEN is set (len=${#CIVITAI_TOKEN})."
-    fi
-
-    echo "[sync] removing incompatible syncthing config (if present)"
-    rm -rf /workspace/home/user/.config/syncthing 2>/dev/null || true
-    rm -rf /home/user/.config/syncthing 2>/dev/null || true
-    pkill -f syncthing 2>/dev/null || true
-
     if [[ ! -d /opt/environments/python ]]; then 
         export MAMBA_BASE=true
     fi
@@ -166,26 +155,24 @@ function provisioning_get_extensions() {
 }
 
 function provisioning_get_models() {
-  if [[ -z $2 ]]; then return 1; fi
-  dir="$1"
-  mkdir -p "$dir"
-  shift
-
-  # Keep warning, but download all requested models anyway
-  if [[ $DISK_GB_ALLOCATED -lt $DISK_GB_REQUIRED ]]; then
-    printf "WARNING: Low disk space allocation (%sGB < %sGB). Attempting all downloads anyway.\n" \
-      "$DISK_GB_ALLOCATED" "$DISK_GB_REQUIRED"
-  fi
-
-  arr=("$@")
-  printf "Downloading %s model(s) to %s...\n" "${#arr[@]}" "$dir"
-  for url in "${arr[@]}"; do
-    printf "Downloading: %s\n" "${url}"
-    provisioning_download "${url}" "${dir}"
-    printf "\n"
-  done
+    if [[ -z $2 ]]; then return 1; fi
+    dir="$1"
+    mkdir -p "$dir"
+    shift
+    if [[ $DISK_GB_ALLOCATED -ge $DISK_GB_REQUIRED ]]; then
+        arr=("$@")
+    else
+        printf "WARNING: Low disk space allocation - Only the first model will be downloaded!\n"
+        arr=("$1")
+    fi
+    
+    printf "Downloading %s model(s) to %s...\n" "${#arr[@]}" "$dir"
+    for url in "${arr[@]}"; do
+        printf "Downloading: %s\n" "${url}"
+        provisioning_download "${url}" "${dir}"
+        printf "\n"
+    done
 }
-
 
 function provisioning_print_header() {
     printf "\n##############################################\n#                                            #\n#          Provisioning container            #\n#                                            #\n#         This will take some time           #\n#                                            #\n# Your container will be ready on completion #\n#                                            #\n##############################################\n\n"
@@ -201,36 +188,17 @@ function provisioning_print_end() {
 
 # Download from $1 URL to $2 file path
 function provisioning_download() {
-  local url="$1"
-  local outdir="$2"
-
-  mkdir -p "$outdir"
-
-  # Add token headers only for the origin hosts.
-  local headers=()
-  if [[ -n "${HF_TOKEN:-}" && "$url" == *"huggingface.co"* ]]; then
-    headers+=(-H "Authorization: Bearer ${HF_TOKEN}")
-  elif [[ -n "${CIVITAI_TOKEN:-}" && "$url" == *"civitai.com"* ]]; then
-    headers+=(-H "Authorization: Bearer ${CIVITAI_TOKEN}")
-  fi
-
-  echo "[download] $url"
-
-  # Print final HTTP code for visibility (doesn't download yet).
-  local code
-  code="$(curl -sS -L -o /dev/null -w "%{http_code}" -A "Mozilla/5.0" "${headers[@]}" "$url" || true)"
-  echo "[download] http=$code"
-
-  # Actual download (follows redirect to R2)
-  curl -fL -A "Mozilla/5.0" \
-    --retry 15 --retry-delay 3 --retry-connrefused \
-    -C - -OJ \
-    "${headers[@]}" \
-    --output-dir "$outdir" \
-    "$url"
+    if [[ -n $HF_TOKEN && $1 =~ ^https://([a-zA-Z0-9_-]+\.)?huggingface\.co(/|$|\?) ]]; then
+        auth_token="$HF_TOKEN"
+    elif 
+        [[ -n $CIVITAI_TOKEN && $1 =~ ^https://([a-zA-Z0-9_-]+\.)?civitai\.com(/|$|\?) ]]; then
+        auth_token="$CIVITAI_TOKEN"
+    fi
+    if [[ -n $auth_token ]];then
+        wget --header="Authorization: Bearer $auth_token" -qnc --content-disposition --show-progress -e dotbytes="${3:-4M}" -P "$2" "$1"
+    else
+        wget -qnc --content-disposition --show-progress -e dotbytes="${3:-4M}" -P "$2" "$1"
+    fi
 }
-
-
-
 
 provisioning_start
