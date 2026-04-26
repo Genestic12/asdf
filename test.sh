@@ -33,6 +33,7 @@ EXTENSIONS=(
 CHECKPOINT_MODELS=(
     #"https://civitai.com/api/download/models/2484701?type=Model&format=SafeTensor&size=pruned&fp=fp16" #Nova F14
     "https://civitai.com/api/download/models/2642038?type=Model&format=SafeTensor&size=pruned&fp=fp16" #Nova F15.5
+    "https://civitai.com/api/download/models/2598129?type=Model&format=SafeTensor&size=pruned&fp=fp16" #Nova PKM
     #"https://civitai.com/api/download/models/2765021?type=Model&format=SafeTensor&size=pruned&fp=fp16" #Nova K8
     #"https://civitai.com/api/download/models/2747469?type=Model&format=SafeTensor&size=pruned&fp=fp16"
     #"https://civitai.com/api/download/models/2245910?type=Model&format=SafeTensor&size=pruned&fp=fp16"
