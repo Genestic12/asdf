@@ -17,7 +17,7 @@ set -Eeuo pipefail
 FORGE_DIR="${FORGE_DIR:-/workspace/stable-diffusion-webui-forge}"
 VENV_PATH="${VENV_PATH:-/workspace/venvs/stable-diffusion-webui-forge}"
 AUTO_UPDATE="${AUTO_UPDATE:-false}"
-MIN_FREE_GB=10
+MIN_FREE_GB=5
 
 APT_PACKAGES=(
     # "package-1"
