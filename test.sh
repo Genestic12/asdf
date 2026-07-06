@@ -205,6 +205,7 @@ function provisioning_download() {
         --content-disposition \
         --show-progress \
         --tries=3 \
+        --no-clobber \
         -P "$2" "$1"
     else
         wget -qnc --content-disposition --show-progress -e dotbytes="${3:-4M}" -P "$2" "$1"
