@@ -8,6 +8,7 @@
 ### If you specify gated models you'll need to set environment variables HF_TOKEN and/orf CIVITAI_TOKEN
 
 DISK_GB_REQUIRED=10
+SKIP_MODEL_DOWNLOADS="${SKIP_MODEL_DOWNLOADS:-false}"
 
 APT_PACKAGES=(
     #"package-1"
@@ -86,21 +87,25 @@ function provisioning_start() {
     provisioning_get_apt_packages
     provisioning_get_pip_packages
     provisioning_get_extensions
-    provisioning_get_models \
-        "${WORKSPACE}/storage/stable_diffusion/models/ckpt" \
-        "${CHECKPOINT_MODELS[@]}"
-    provisioning_get_models \
-        "${WORKSPACE}/storage/stable_diffusion/models/lora" \
-        "${LORA_MODELS[@]}"
-    provisioning_get_models \
-        "${WORKSPACE}/storage/stable_diffusion/models/controlnet" \
-        "${CONTROLNET_MODELS[@]}"
-    provisioning_get_models \
-        "${WORKSPACE}/storage/stable_diffusion/models/vae" \
-        "${VAE_MODELS[@]}"
-    provisioning_get_models \
-        "${WORKSPACE}/storage/stable_diffusion/models/esrgan" \
-        "${ESRGAN_MODELS[@]}"
+    if [[ "${SKIP_MODEL_DOWNLOADS,,}" != "true" ]]; then
+        provisioning_get_models \
+            "${WORKSPACE}/storage/stable_diffusion/models/ckpt" \
+            "${CHECKPOINT_MODELS[@]}"
+        provisioning_get_models \
+            "${WORKSPACE}/storage/stable_diffusion/models/lora" \
+            "${LORA_MODELS[@]}"
+        provisioning_get_models \
+            "${WORKSPACE}/storage/stable_diffusion/models/controlnet" \
+            "${CONTROLNET_MODELS[@]}"
+        provisioning_get_models \
+            "${WORKSPACE}/storage/stable_diffusion/models/vae" \
+            "${VAE_MODELS[@]}"
+        provisioning_get_models \
+            "${WORKSPACE}/storage/stable_diffusion/models/esrgan" \
+            "${ESRGAN_MODELS[@]}"
+    else
+        printf "SKIP_MODEL_DOWNLOADS=true; skipping model downloads.\n"
+    fi
      
     PLATFORM_ARGS=""
     if [[ $XPU_TARGET = "CPU" ]]; then
