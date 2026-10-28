@@ -209,7 +209,7 @@ function provisioning_download() {
             cd "$2" || exit 1
             curl -fL \
                 --retry 3 \
-                --retry-all-errors \
+                --skip-existing \
                 --remote-name \
                 --remote-header-name \
                 -H "Authorization: Bearer $auth_token" \
@@ -220,7 +220,7 @@ function provisioning_download() {
             cd "$2" || exit 1
             curl -fL \
                 --retry 3 \
-                --retry-all-errors \
+                --skip-existing \
                 --remote-name \
                 --remote-header-name \
                 "$1"
