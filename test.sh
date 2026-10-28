@@ -16,8 +16,7 @@ APT_PACKAGES=(
 )
 
 PIP_PACKAGES=(
-    #"package-1"
-    #"package-2"
+    "mediapipe==0.10.14"
 )
 
 EXTENSIONS=(
