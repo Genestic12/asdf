@@ -66,7 +66,7 @@ ESRGAN_MODELS=(
 )
 
 CONTROLNET_MODELS=(
-
+    "https://huggingface.co/thibaud/controlnet-openpose-sdxl-1.0/resolve/main/OpenPoseXL2.safetensors"
 )
 
 
